@@ -31,9 +31,9 @@ void runShell(){
   int status;
   int fileDescriptor;
   int result;
-  int inputFileCheck = 0;
+
   char *inputFile;
-  int outputFileCheck = 0;
+
   char *outputFile;
   int childPIDS[100];
   int PIDindex = 0;
@@ -55,8 +55,8 @@ void runShell(){
 
     strcpy(firstCommand, parsedCmds[0]);
 
-
-
+    int outputFileCheck = 0;
+    int inputFileCheck = 0;
 
 
     for (i = 0; i < numCmds; i++)
