@@ -96,7 +96,16 @@ void runShell(){
 
       if (strstr(parsedCmds[numCmds-1], doubleDollar) != NULL){
         char * token = strtok(parsedCmds[numCmds-1], doubleDollar);
-        sprintf(parsedCmds[numCmds-1] , "%s%d", token, getpid());
+        if (token != NULL)
+        {
+          sprintf(parsedCmds[numCmds-1] , "%s%d", token, getpid());
+        //  printf("%s\n",parsedCmds[numCmds-1]);
+        }
+        else
+        {
+          sprintf(parsedCmds[numCmds-1] , "%d", getpid());
+        //  printf("%s\n",parsedCmds[numCmds-1]);
+        }
       }
 
 
@@ -278,6 +287,7 @@ void catchSIGINT(int signo){
   char* termDisp;
   sprintf(termDisp, "terminated by signal %d\n", signo);
   write(STDOUT_FILENO, termDisp, 23);
+  fflush(stdout);
 }
 
 void catchSIGTSTP(int signo){
@@ -286,11 +296,13 @@ void catchSIGTSTP(int signo){
     forgroundOnlyMode = 1;
     char * forMess = "Entering forground-only mode (& is now ignored)\n";
     write(STDOUT_FILENO, forMess, 48);
+    fflush(stdout);
   }
   else if (forgroundOnlyMode == 1){
     forgroundOnlyMode = 0;
     char * forOffMess = "Exiting forground-only mode\n";
     write(STDOUT_FILENO, forOffMess, 28);
+    fflush(stdout);
   }
 }
 
