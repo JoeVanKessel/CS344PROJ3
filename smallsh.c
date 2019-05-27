@@ -10,8 +10,12 @@
 int getArguments(char **, int, int *, int);
 void runShell();
 void catchSIGINT(int);
+void catchSIGTSTP(int);
+void catchSIGINTBACK(int);
 int runBackgroundProcess(char*, char*, char**, int, int);
 int redirectIO(char*, char*, char*, int, int);
+
+int forgroundOnlyMode = 0;
 
 int main(){
   runShell();
@@ -19,11 +23,7 @@ int main(){
 
 void runShell(){
 
-  struct sigaction SIGINT_action = {0};
-  SIGINT_action.sa_handler = catchSIGINT;
-  sigfillset(&SIGINT_action.sa_mask);
-  //SIGINT_action.sa_flags = SA_RESTART;
-  sigaction(SIGINT, &SIGINT_action, NULL);
+
 
   char *parsedCmds[MAX_SIZE_OF_CMDLINE];
   int numCmds;
@@ -35,7 +35,7 @@ void runShell(){
   char *inputFile;
 
   char *outputFile;
-  int childPIDS[100];
+  int childPIDS[2048];
   int PIDindex = 0;
   int aPID;
   int i;
@@ -46,6 +46,14 @@ void runShell(){
   while(1)
   {
 
+    struct sigaction SIGINT_action = {0};
+    SIGINT_action.sa_handler = SIG_IGN;
+    sigaction(SIGINT, &SIGINT_action, NULL);
+
+    struct sigaction SIGTSTP_action = {0};
+    SIGTSTP_action.sa_handler = catchSIGTSTP;
+    sigaction(SIGTSTP, &SIGTSTP_action, NULL);
+
 
     pid_t spawnpid = -5;
     int isRedirection = 0;
@@ -53,7 +61,7 @@ void runShell(){
     //printf("here\n" );
     int background = 0;
 
-    strcpy(firstCommand, parsedCmds[0]);
+
 
     int outputFileCheck = 0;
     int inputFileCheck = 0;
@@ -78,30 +86,36 @@ void runShell(){
       }
     }
 
-    char * result = strstr(parsedCmds[numCmds-1], doubleDollar);
+
+
+    if (numCmds != 0 )
+    {
+
+      strcpy(firstCommand, parsedCmds[0]);
+      char * result = strstr(parsedCmds[numCmds-1], doubleDollar);
+
       if (strstr(parsedCmds[numCmds-1], doubleDollar) != NULL){
         char * token = strtok(parsedCmds[numCmds-1], doubleDollar);
         sprintf(parsedCmds[numCmds-1] , "%s%d", token, getpid());
       }
 
 
-    if (numCmds != 0 )
-    {
+      if(strcmp(parsedCmds[numCmds-1], "&") == 0 && forgroundOnlyMode == 0){
+        //  printf("here\n");
 
-      if(strcmp(parsedCmds[numCmds-1], "&") == 0){
-      //  printf("here\n");
-        parsedCmds[numCmds-1] = '\0';
-        background = 1;
-        if(isRedirection == 0 ){
-          //printf("background process with NO specified redirection files\n");
-          childPIDS[PIDindex] = runBackgroundProcess("/dev/null", "/dev/null", parsedCmds, inputFileCheck, outputFileCheck);
-          PIDindex++;
-        }
-        // if(isRedirection == 1){
-        //   //printf("background process with specified redirection files\n");
-        //   runBackgroundProcess(inputFile, outputFile, parsedCmds, inputFileCheck, outputFileCheck);
-        //
-        // }
+          parsedCmds[numCmds-1] = '\0';
+          background = 1;
+          if(isRedirection == 0 ){
+            //printf("background process with NO specified redirection files\n");
+            childPIDS[PIDindex] = runBackgroundProcess("/dev/null", "/dev/null", parsedCmds, inputFileCheck, outputFileCheck);
+            PIDindex++;
+            }
+
+          // if(isRedirection == 1){
+          //   //printf("background process with specified redirection files\n");
+          //   runBackgroundProcess(inputFile, outputFile, parsedCmds, inputFileCheck, outputFileCheck);
+          //
+          // }
       }
 
       else if (isRedirection == 1 && background == 0)
@@ -135,6 +149,17 @@ void runShell(){
 
       else
       {
+        if(strcmp(parsedCmds[numCmds-1], "&") == 0){
+          parsedCmds[numCmds-1] = '\0';
+        }
+        struct sigaction SIGINT_action = {0};
+        SIGINT_action.sa_handler = catchSIGINT;
+        sigfillset(&SIGINT_action.sa_mask);
+        //SIGINT_action.sa_flags = SA_RESTART;
+        sigaction(SIGINT, &SIGINT_action, NULL);
+
+
+
         spawnpid = fork();
         switch (spawnpid)
         {
@@ -250,9 +275,23 @@ int getArguments(char **parsedCmds, int childExitMethod, int *childPIDS, int PID
 }
 
 void catchSIGINT(int signo){
-  char* message = "\n";
+  char* termDisp;
+  sprintf(termDisp, "terminated by signal %d\n", signo);
+  write(STDOUT_FILENO, termDisp, 23);
+}
 
-  write(STDOUT_FILENO, message, 28);
+void catchSIGTSTP(int signo){
+  if (forgroundOnlyMode == 0)
+  {
+    forgroundOnlyMode = 1;
+    char * forMess = "Entering forground-only mode (& is now ignored)\n";
+    write(STDOUT_FILENO, forMess, 48);
+  }
+  else if (forgroundOnlyMode == 1){
+    forgroundOnlyMode = 0;
+    char * forOffMess = "Exiting forground-only mode\n";
+    write(STDOUT_FILENO, forOffMess, 28);
+  }
 }
 
 int redirectIO(char * inputFile, char * outputFile, char *parsedCmd, int inputFileCheck, int outputFileCheck){
